@@ -132,9 +132,6 @@ export function AuthCard() {
                   {signInPending && <Loader2 className="h-4 w-4 animate-spin" />}
                   Sign In
                 </Button>
-                <p className="text-center text-xs text-muted-foreground">
-                  Demo admin: admin@assetflow.io / admin12345
-                </p>
               </form>
             </TabsContent>
 

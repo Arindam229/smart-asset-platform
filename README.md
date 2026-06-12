@@ -1,5 +1,7 @@
 # AssetFlow — Smart Asset Management & Resource Allocation Platform
 
+**[Live Deployment on Vercel](https://smart-asset-platform.vercel.app/)**
+
 A production-grade, edge-ready platform for managing shared organizational
 assets: inventory, booking requests, approval workflows, and utilization
 analytics — with a fully animated, mobile-first UI.
@@ -15,7 +17,7 @@ analytics — with a fully animated, mobile-first UI.
 - **UI**: shadcn/ui (base-nova / Base UI primitives), Aceternity-style
   components (grid background, spotlight, text-generate effect), Framer
   Motion animations
-- **Hosting**: Cloudflare (via OpenNext + Wrangler), edge runtime throughout
+- **Hosting**: Vercel (Serverless Functions)
 
 ## Project Structure
 
@@ -47,7 +49,7 @@ supabase/migrations/schema.sql Raw SQL migration + seed data
 
 - Node.js 20+
 - A [Neon](https://neon.tech) Postgres database
-- A [Cloudflare](https://dash.cloudflare.com) account (for deployment)
+- A [Vercel](https://vercel.com) account (for deployment)
 
 ## 1. Install dependencies
 
@@ -67,7 +69,7 @@ cp .env.example .env.local
 | ------------------ | ---------------------------------------------------------------------------- |
 | `DATABASE_URL`     | Neon Postgres connection string (`...?sslmode=require`)                      |
 | `AUTH_SECRET`      | Random 32-byte secret — generate with `openssl rand -base64 32`              |
-| `AUTH_TRUST_HOST`  | Set to `true` (required for non-Vercel hosts, incl. Cloudflare)              |
+| `AUTH_TRUST_HOST`  | Set to `true` (required for non-Vercel hosts)              |
 
 ## 3. Set up the database
 
@@ -134,50 +136,14 @@ All routes declare `export const runtime = "edge"`, so a successful
 Node-only built-ins outside of the edge-compatible polyfills already in use:
 `bcryptjs` for hashing and `@neondatabase/serverless` for Postgres access).
 
-## Deploying to Cloudflare
+## Deploying to Vercel
 
-This project deploys to Cloudflare Workers via
-[OpenNext](https://opennext.js.org/cloudflare) + Wrangler (already configured
-in `wrangler.jsonc` and `open-next.config.ts`, with the `nodejs_compat`
-compatibility flag enabled).
+This project is optimized for deployment to Vercel. 
+Simply push to your GitHub repository and link it to a new project in the Vercel Dashboard. Vercel will automatically detect Next.js and build it.
 
-### One-time setup
+Ensure you set all the Environment Variables (`DATABASE_URL`, `AUTH_SECRET`, etc.) in the Vercel Dashboard.
 
-```bash
-npx wrangler login
-```
-
-Set production secrets (these are **not** read from `.env` files in
-production):
-
-```bash
-npx wrangler secret put DATABASE_URL
-npx wrangler secret put AUTH_SECRET
-npx wrangler secret put AUTH_TRUST_HOST
-```
-
-### Local preview (runs in the Workers runtime via Miniflare)
-
-```bash
-cp .dev.vars.example .dev.vars   # fill in DATABASE_URL / AUTH_SECRET
-npm run preview
-```
-
-### Deploy
-
-```bash
-npm run deploy
-```
-
-This runs `opennextjs-cloudflare build` (converts the Next.js build output
-into a Cloudflare Worker bundle) followed by `opennextjs-cloudflare deploy`
-(publishes via Wrangler).
-
-### Generating Cloudflare environment types (optional)
-
-```bash
-npm run cf-typegen
-```
+Vercel Cron Jobs are automatically configured via the `vercel.json` file.
 
 ## Notes on edge runtime
 
@@ -187,5 +153,4 @@ Every layout, page, and route handler in `app/` exports
 Server actions that need a real SQL transaction (booking creation, rejection,
 and returns) use a dedicated `drizzle-orm/neon-serverless` `Pool` connection
 (`lib/db/transaction.ts`) — the default `neon-http` driver used everywhere
-else does not support `BEGIN`/`COMMIT`. Both drivers run on Cloudflare's
-`workerd` runtime with the `nodejs_compat` flag enabled.
+else does not support `BEGIN`/`COMMIT`. Both drivers are compatible with standard Node.js serverless functions on Vercel.
