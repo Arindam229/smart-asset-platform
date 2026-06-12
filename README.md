@@ -1,10 +1,12 @@
-# AssetFlow — Smart Asset Management & Resource Allocation Platform
+# AssetFlow - Smart Asset Management & Resource Allocation Platform
 
 **[Live Deployment on Vercel](https://smart-asset-platform.vercel.app/)**
+**[Demonstration Video (YouTube)](https://www.youtube.com/watch?v=GXbbSF1Lmjc)**
+**[Deliverable 2: Design Document (PDF)](./design-document.pdf)**
 
 A production-grade, edge-ready platform for managing shared organizational
 assets: inventory, booking requests, approval workflows, and utilization
-analytics — with a fully animated, mobile-first UI.
+analytics - with a fully animated, mobile-first UI.
 
 ## Tech Stack
 
