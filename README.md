@@ -1,36 +1,191 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# AssetFlow — Smart Asset Management & Resource Allocation Platform
 
-## Getting Started
+A production-grade, edge-ready platform for managing shared organizational
+assets: inventory, booking requests, approval workflows, and utilization
+analytics — with a fully animated, mobile-first UI.
 
-First, run the development server:
+## Tech Stack
+
+- **Framework**: Next.js 16 (App Router, TypeScript, Tailwind CSS v4)
+- **Database**: Neon Serverless Postgres via `@neondatabase/serverless` +
+  Drizzle ORM (`neon-http` for queries, `neon-serverless` for transactional
+  booking writes)
+- **Auth**: Auth.js (NextAuth v5) — JWT sessions, Drizzle adapter, role-based
+  middleware (`Admin` / `Consumer`)
+- **UI**: shadcn/ui (base-nova / Base UI primitives), Aceternity-style
+  components (grid background, spotlight, text-generate effect), Framer
+  Motion animations
+- **Hosting**: Cloudflare (via OpenNext + Wrangler), edge runtime throughout
+
+## Project Structure
+
+```
+app/
+  page.tsx                     Landing page (sign in / sign up)
+  dashboard/
+    layout.tsx                 Responsive shell (sidebar + header)
+    page.tsx                   Role-based redirect
+    consumer/page.tsx          Asset explorer + booking history
+    admin/inventory/page.tsx   Asset CRUD
+    admin/approvals/page.tsx   Booking approval queue
+    analytics/page.tsx         KPIs + utilization charts
+  actions/                     Server actions (assets, bookings, approvals, analytics, auth)
+  api/auth/[...nextauth]/      Auth.js route handlers
+components/
+  ui/                          shadcn/ui primitives
+  landing/                     Aceternity-style landing components
+  dashboard/                   Sidebar, header, nav
+  admin/                       Inventory + approvals + analytics widgets
+  shared/                      Status badges, booking dialog, asset card
+lib/
+  db/                          Drizzle schema, client, transaction helper
+  auth.ts / auth.config.ts     Auth.js configuration
+supabase/migrations/schema.sql Raw SQL migration + seed data
+```
+
+## Prerequisites
+
+- Node.js 20+
+- A [Neon](https://neon.tech) Postgres database
+- A [Cloudflare](https://dash.cloudflare.com) account (for deployment)
+
+## 1. Install dependencies
+
+```bash
+npm install
+```
+
+## 2. Configure environment variables
+
+Copy the example file and fill in your values:
+
+```bash
+cp .env.example .env.local
+```
+
+| Variable          | Description                                                                 |
+| ------------------ | ---------------------------------------------------------------------------- |
+| `DATABASE_URL`     | Neon Postgres connection string (`...?sslmode=require`)                      |
+| `AUTH_SECRET`      | Random 32-byte secret — generate with `openssl rand -base64 32`              |
+| `AUTH_TRUST_HOST`  | Set to `true` (required for non-Vercel hosts, incl. Cloudflare)              |
+
+## 3. Set up the database
+
+Apply the schema (tables, enums, constraints, indexes) and seed data using
+the raw SQL migration. The easiest way is via the Neon SQL editor or `psql`:
+
+```bash
+psql "$DATABASE_URL" -f supabase/migrations/schema.sql
+```
+
+Alternatively, push the Drizzle schema directly (equivalent tables, no seed
+data):
+
+```bash
+npm run db:push
+```
+
+The seed data includes a **demo admin account**:
+
+- Email: `admin@assetflow.io`
+- Password: `admin12345`
+
+New accounts created via the Sign Up form are always given the `Consumer`
+role. To promote another user to `Admin`, run:
+
+```sql
+update users set role = 'Admin' where email = 'you@example.com';
+```
+
+## 4. Run the dev server
 
 ```bash
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Open [http://localhost:3000](http://localhost:3000). Sign in with the demo
+admin account to access Inventory, Approvals, and Analytics, or sign up for
+a new Consumer account to browse assets and request bookings.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+### Booking lifecycle
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+1. **Consumer** browses available assets (`/dashboard/consumer`) and submits
+   a booking request. `requestBooking` runs inside an isolated transaction
+   (`lib/db/transaction.ts`) that locks the asset row (`FOR UPDATE`),
+   re-checks `quantity_available`, decrements stock, and inserts a `Pending`
+   booking — preventing overbooking under concurrent requests.
+2. **Admin** reviews the queue (`/dashboard/admin/approvals`):
+   - **Approve** — booking moves to `Approved` (stock stays allocated).
+   - **Reject** — booking moves to `Rejected` and the reserved stock is
+     released back to `quantity_available`.
+   - **Mark Returned** — booking moves to `Returned` and stock is restored.
+3. Every state change writes an `audit_logs` entry and revalidates the
+   consumer, inventory, and analytics pages.
 
-## Learn More
+## 5. Type-check & build
 
-To learn more about Next.js, take a look at the following resources:
+```bash
+npx tsc --noEmit
+npm run build
+```
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+All routes declare `export const runtime = "edge"`, so a successful
+`next build` confirms the entire app runs on Web-standard APIs only (no
+Node-only built-ins outside of the edge-compatible polyfills already in use:
+`bcryptjs` for hashing and `@neondatabase/serverless` for Postgres access).
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+## Deploying to Cloudflare
 
-## Deploy on Vercel
+This project deploys to Cloudflare Workers via
+[OpenNext](https://opennext.js.org/cloudflare) + Wrangler (already configured
+in `wrangler.jsonc` and `open-next.config.ts`, with the `nodejs_compat`
+compatibility flag enabled).
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+### One-time setup
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+```bash
+npx wrangler login
+```
+
+Set production secrets (these are **not** read from `.env` files in
+production):
+
+```bash
+npx wrangler secret put DATABASE_URL
+npx wrangler secret put AUTH_SECRET
+npx wrangler secret put AUTH_TRUST_HOST
+```
+
+### Local preview (runs in the Workers runtime via Miniflare)
+
+```bash
+cp .dev.vars.example .dev.vars   # fill in DATABASE_URL / AUTH_SECRET
+npm run preview
+```
+
+### Deploy
+
+```bash
+npm run deploy
+```
+
+This runs `opennextjs-cloudflare build` (converts the Next.js build output
+into a Cloudflare Worker bundle) followed by `opennextjs-cloudflare deploy`
+(publishes via Wrangler).
+
+### Generating Cloudflare environment types (optional)
+
+```bash
+npm run cf-typegen
+```
+
+## Notes on edge runtime
+
+Every layout, page, and route handler in `app/` exports
+`export const runtime = "edge"`, and dashboard pages additionally export
+`export const dynamic = "force-dynamic"` so data is always fetched fresh.
+Server actions that need a real SQL transaction (booking creation, rejection,
+and returns) use a dedicated `drizzle-orm/neon-serverless` `Pool` connection
+(`lib/db/transaction.ts`) — the default `neon-http` driver used everywhere
+else does not support `BEGIN`/`COMMIT`. Both drivers run on Cloudflare's
+`workerd` runtime with the `nodejs_compat` flag enabled.

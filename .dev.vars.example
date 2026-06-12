@@ -1,0 +1,9 @@
+# Copy to `.dev.vars` for local `wrangler`/OpenNext preview runs.
+# (next dev` reads `.env.local` instead — see `.env.example`.)
+DATABASE_URL="postgresql://<user>:<password>@<host>.neon.tech/<database>?sslmode=require"
+AUTH_SECRET="replace-with-a-random-32-byte-secret"
+AUTH_TRUST_HOST="true"
+AUTH_GOOGLE_ID="replace-with-your-google-client-id"
+AUTH_GOOGLE_SECRET="replace-with-your-google-client-secret"
+GMAIL_USER="replace-with-your-gmail-address"
+GMAIL_APP_PASSWORD="replace-with-your-16-character-app-password"
